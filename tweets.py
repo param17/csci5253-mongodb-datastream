@@ -21,13 +21,20 @@ def query_mongo_db(mongo_client, received_search_string_json, process_lambda_aft
     product_reviews = db[Constants.MongoDB.Config.collection_name]
     regex = re.compile(".*{}.*".format(search_string), re.IGNORECASE)
     reviews_related_to_search = product_reviews.find({Constants.MongoDB.Keys.review, regex})
-    process_lambda_after_every_batch_fetch(reviews_related_to_search)
+
+    for product_review_chunk in chunks(reviews_related_to_search, Constants.chunk_size):
+        process_lambda_after_every_batch_fetch(product_review_chunk)
 
 
 def send_data_to_kafka_in_parallel(tweets, list_of_running_processes):
     process = Process(target=send_tweets_to_kafka, args=(tweets,))
     list_of_running_processes.append(process)
     process.start()
+
+
+def chunks(arr, chunk_size):
+    for i in range(0, len(arr), chunk_size):
+        yield arr[i:i + chunk_size]
 
 
 def send_tweets_to_kafka(tweets):
@@ -43,7 +50,7 @@ def send_tweets_to_kafka(tweets):
         filtered_tweet = {k: v for (k, v) in x.items() if k in Constants.JSONKeys.requiredKeys}
 
         filtered_tweet[Constants.JSONKeys.search_string] = received_json[Constants.JSONKeys.search_string]
-        filtered_tweet[Constants.JSONKeys.total_tweets] = Constants.GNIP.hard_max
+        filtered_tweet[Constants.JSONKeys.total_tweets] = Constants.hard_max
         tweet_json_str = json.dumps(filtered_tweet)
         future = tweet_producer.send(Constants.Topics.sending, tweet_json_str.encode('ascii', 'ignore'))
         futures.append(future)

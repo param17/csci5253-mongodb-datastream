@@ -2,6 +2,9 @@ import os
 
 
 class Constants:
+    chunk_size = 500
+    hard_max = 2000
+
     class EnvConfig:
         gnip_api_username = os.environ['TWITTER_UNAME']
         gnip_api_password = os.environ['TWITTER_PASS']
