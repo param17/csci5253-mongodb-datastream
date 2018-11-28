@@ -17,10 +17,10 @@ def json_deserializer(received_message):
 
 def query_mongo_db(mongo_client, received_search_string_json, process_lambda_after_every_batch_fetch):
     search_string = received_search_string_json[Constants.JSONKeys.search_string]
-    db = mongo_client['tweets_dump_db']
-    product_reviews = db['product-reviews']
+    db = mongo_client[Constants.MongoDB.Config.db_name]
+    product_reviews = db[Constants.MongoDB.Config.collection_name]
     regex = re.compile(".*{}.*".format(search_string), re.IGNORECASE)
-    reviews_related_to_search = product_reviews.find({'review', regex})
+    reviews_related_to_search = product_reviews.find({Constants.MongoDB.Keys.review, regex})
     process_lambda_after_every_batch_fetch(reviews_related_to_search)
 
 
@@ -71,7 +71,7 @@ if __name__ == "__main__":
         print('Received string: ' + str(received_json))
 
         processes = []
-        client = MongoClient('localhost', 27017)
+        client = MongoClient(Constants.MongoDB.Config.server, Constants.MongoDB.Config.port)
         query_mongo_db(client, received_json, lambda tweets: send_data_to_kafka_in_parallel(tweets, processes))
         print("Number of running processes: %d" % len(processes))
         for proc in processes:

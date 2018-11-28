@@ -21,8 +21,12 @@ class Constants:
         sending = 'tweets'
         consumer_group_name = 'TwitterSearchString'
 
-    class GNIP:
-        language = 'en'
-        filter_param = 'geo'
-        # TODO: Discuss later!
-        hard_max = 2000
+    class MongoDB:
+        class Keys:
+            review = 'review'
+
+        class Config:
+            collection_name = 'product_reviews'
+            db_name = 'tweets_dump_db'
+            server = os.environ['MONGO_SERVER']
+            port = os.environ['MONGO_PORT']
