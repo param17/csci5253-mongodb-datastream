@@ -2,9 +2,10 @@ import json
 
 from kafka import KafkaConsumer, KafkaProducer
 from kafka.errors import KafkaError
-from search.api import Query
 from constants import Constants
 from multiprocessing import Process
+from pymongo import MongoClient
+import re
 
 
 def json_deserializer(received_message):
@@ -14,15 +15,13 @@ def json_deserializer(received_message):
         return json.dumps({Constants.JSONKeys.exception: True})
 
 
-def call_twitter_api(received_search_string_json, process_lambda_after_every_batch_fetch):
-    api_url = "{} lang:{} has:{}".format(received_search_string_json[Constants.JSONKeys.search_string],
-                                         Constants.GNIP.language, Constants.GNIP.filter_param)
-    if Constants.JSONKeys.optional_location in received_search_string_json:
-        api_url += " place: %s" % received_search_string_json[Constants.JSONKeys.optional_location]
-    print(api_url)
-    g = Query(Constants.EnvConfig.gnip_api_username, Constants.EnvConfig.gnip_api_password,
-              Constants.EnvConfig.gnip_api_auth_url, paged=True, hard_max=Constants.GNIP.hard_max)
-    g.execute(api_url, batch_lambda=process_lambda_after_every_batch_fetch)
+def query_mongo_db(mongo_client, received_search_string_json, process_lambda_after_every_batch_fetch):
+    search_string = received_search_string_json[Constants.JSONKeys.search_string]
+    db = mongo_client['tweets_dump_db']
+    product_reviews = db['product-reviews']
+    regex = re.compile(".*{}.*".format(search_string), re.IGNORECASE)
+    reviews_related_to_search = product_reviews.find({'review', regex})
+    process_lambda_after_every_batch_fetch(reviews_related_to_search)
 
 
 def send_data_to_kafka_in_parallel(tweets, list_of_running_processes):
@@ -72,7 +71,8 @@ if __name__ == "__main__":
         print('Received string: ' + str(received_json))
 
         processes = []
-        call_twitter_api(received_json, lambda tweets: send_data_to_kafka_in_parallel(tweets, processes))
+        client = MongoClient('localhost', 27017)
+        query_mongo_db(client, received_json, lambda tweets: send_data_to_kafka_in_parallel(tweets, processes))
         print("Number of running processes: %d" % len(processes))
         for proc in processes:
             proc.join()
